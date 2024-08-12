@@ -1,17 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
-
+ 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
-    <title>Canvas Image Manager</title>
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+    <title>Hotspot-TEI</title>
     <style>
         * {
             margin: 0;
             padding: 0;
         }
-
+ 
         #imageContainer {
             margin-top: 10px;
             height: 500px;
@@ -19,7 +20,7 @@
             border: 1px solid black;
             position: relative;
         }
-
+ 
         #Mycanvas {
             margin-top: 100px;
             height: 300px;
@@ -30,31 +31,31 @@
             top: 0;
             left: 0;
         }
-
+ 
         #controls {
             margin: 10px;
         }
-
+ 
         #shapeSelector {
             margin-top: 10px;
         }
-
+ 
         #forward-back {
             display: flex;
             justify-content: space-between;
             margin-bottom: 10px;
         }
-
+ 
         #right-items {
             display: flex;
             gap: 10px;
         }
     </style>
 </head>
-
+ 
 <body>
     <input type="file" id="imageUploader" accept="image/*">
-
+ 
     <div id="controls">
         <div id="shapeSelector">
             <label for="shape">Select Shape:</label>
@@ -66,7 +67,10 @@
             </select>
         </div>
     </div>
-
+    <div>
+        <p>Select Opacity</p>
+        <input type="range" id="opacityRange" min="0" max="100" value="100">
+    </div>
     <div id="imageContainer">
         <div id="forward-back">
             <button id="addHotspot">Add HOTSPOT</button>
@@ -75,226 +79,12 @@
                 <button id="redoBtn">Redo</button>
             </div>
         </div>
-
+ 
         <canvas id="Mycanvas"></canvas>
     </div>
-
-    <script>
-        class CanvasImageManager {
-            constructor(canvasId, fileInputId, shapeSelectId, undoBtnId, redoBtnId) {
-                this.canvas = document.getElementById(canvasId);
-                this.ctx = this.canvas.getContext('2d');
-                this.image = new Image();
-                this.fileInput = document.getElementById(fileInputId);
-                this.shapeSelect = document.getElementById(shapeSelectId);
-
-                this.isDrawing = false;
-                this.startX = 0;
-                this.startY = 0;
-                this.selectedShape = 'rectangle';
-                this.shapes = [];
-
-                this.imageOffsetX = 0;
-                this.imageOffsetY = 0;
-                this.imageScale = 1;
-
-                this.history = [];
-                this.currentState = -1;
-
-                this.undoBtn = document.getElementById(undoBtnId);
-                this.redoBtn = document.getElementById(redoBtnId);
-
-                this.init();
-            }
-
-            init() {
-                this.fileInput.addEventListener('change', this.handleFileSelect.bind(this));
-                this.canvas.addEventListener('mousedown', this.startDrawing.bind(this));
-                this.canvas.addEventListener('mousemove', this.draw.bind(this));
-                this.canvas.addEventListener('mouseup', this.stopDrawing.bind(this));
-                this.shapeSelect.addEventListener('change', (e) => {
-                    this.selectedShape = e.target.value;
-                });
-                this.undoBtn.addEventListener('click', this.undo.bind(this));
-                this.redoBtn.addEventListener('click', this.redo.bind(this));
-            }
-
-            handleFileSelect(e) {
-                const file = e.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = this.handleFileLoad.bind(this);
-                    reader.readAsDataURL(file);
-                }
-            }
-
-            handleFileLoad(event) {
-                this.image.onload = this.drawImage.bind(this);
-                this.image.src = event.target.result;
-            }
-
-            drawImage() {
-                const canvasWidth = this.canvas.width;
-                const canvasHeight = this.canvas.height;
-
-                const imageAspect = this.image.width / this.image.height;
-                const canvasAspect = canvasWidth / canvasHeight;
-
-                let drawWidth, drawHeight;
-                let offsetX = 0, offsetY = 0;
-
-                if (imageAspect > canvasAspect) {
-                    drawWidth = canvasWidth;
-                    drawHeight = canvasWidth / imageAspect;
-                    offsetY = (canvasHeight - drawHeight) / 2;
-                } else {
-                    drawHeight = canvasHeight;
-                    drawWidth = canvasHeight * imageAspect;
-                    offsetX = (canvasWidth - drawWidth) / 2;
-                }
-
-                this.imageOffsetX = offsetX;
-                this.imageOffsetY = offsetY;
-                this.imageScale = drawWidth / this.image.width;
-
-                this.ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-                this.ctx.drawImage(this.image, offsetX, offsetY, drawWidth, drawHeight);
-
-                this.shapes.forEach(shape => this.drawShape(shape));
-            }
-
-            getMousePos(e) {
-                const rect = this.canvas.getBoundingClientRect();
-                const scaleX = this.canvas.width / rect.width;
-                const scaleY = this.canvas.height / rect.height;
-
-                return {
-                    x: (e.clientX - rect.left) * scaleX,
-                    y: (e.clientY - rect.top) * scaleY
-                };
-            }
-
-            startDrawing(e) {
-                const pos = this.getMousePos(e);
-                this.isDrawing = true;
-                this.startX = (pos.x - this.imageOffsetX) / this.imageScale;
-                this.startY = (pos.y - this.imageOffsetY) / this.imageScale;
-            }
-
-            draw(e) {
-                if (!this.isDrawing) return;
-
-                const pos = this.getMousePos(e);
-                const endX = (pos.x - this.imageOffsetX) / this.imageScale;
-                const endY = (pos.y - this.imageOffsetY) / this.imageScale;
-
-                this.drawImage();
-
-                const shape = {
-                    type: this.selectedShape,
-                    startX: this.startX,
-                    startY: this.startY,
-                    endX: endX,
-                    endY: endY
-                };
-                this.drawShape(shape);
-            }
-
-            stopDrawing(e) {
-                if (!this.isDrawing) return;
-
-                const pos = this.getMousePos(e);
-                const endX = (pos.x - this.imageOffsetX) / this.imageScale;
-                const endY = (pos.y - this.imageOffsetY) / this.imageScale;
-
-                const newShape = {
-                    type: this.selectedShape,
-                    startX: this.startX,
-                    startY: this.startY,
-                    endX: endX,
-                    endY: endY
-                };
-
-                this.addToHistory([...this.shapes, newShape]);
-                this.shapes.push(newShape);
-
-                this.isDrawing = false;
-                this.drawImage();
-            }
-
-            drawShape(shape) {
-                this.ctx.save();
-                this.ctx.strokeStyle = 'red';
-                this.ctx.lineWidth = 2;
-
-                const startX = shape.startX * this.imageScale + this.imageOffsetX;
-                const startY = shape.startY * this.imageScale + this.imageOffsetY;
-                const width = (shape.endX - shape.startX) * this.imageScale;
-                const height = (shape.endY - shape.startY) * this.imageScale;
-
-                switch (shape.type) {
-                    case 'rectangle':
-                        this.ctx.strokeRect(startX, startY, width, height);
-                        break;
-                    case 'square':
-                        const side = Math.min(Math.abs(width), Math.abs(height));
-                        this.ctx.strokeRect(startX, startY, side * Math.sign(width), side * Math.sign(height));
-                        break;
-                    case 'circle':
-                        const radius = Math.sqrt(width * width + height * height) / 2;
-                        this.ctx.beginPath();
-                        this.ctx.arc(startX + width / 2, startY + height / 2, radius, 0, Math.PI * 2);
-                        this.ctx.stroke();
-                        break;
-                    case 'triangle':
-                        this.ctx.beginPath();
-                        this.ctx.moveTo(startX, startY);
-                        this.ctx.lineTo(startX + width, startY);
-                        this.ctx.lineTo(startX + width / 2, startY + height);
-                        this.ctx.closePath();
-                        this.ctx.stroke();
-                        break;
-                    default:
-                       // console.log('Unknown shape:', shape.type);
-                }
-
-                this.ctx.restore();
-            }
-
-            addToHistory(shapes) {
-                this.history = this.history.slice(0, this.currentState + 1);
-                this.history.push(shapes);
-                this.currentState++;
-                this.updateButtonStates();
-            }
-
-            undo() {
-                if (this.currentState > 0) {
-                    this.currentState--;
-                    this.shapes = [...this.history[this.currentState]];
-                    this.drawImage();
-                    this.updateButtonStates();
-                }
-            }
-
-            redo() {
-                if (this.currentState < this.history.length - 1) {
-                    this.currentState++;
-                    this.shapes = [...this.history[this.currentState]];
-                    this.drawImage();
-                    this.updateButtonStates();
-                }
-            }
-
-            updateButtonStates() {
-                this.undoBtn.disabled = this.currentState <= 0;
-                this.redoBtn.disabled = this.currentState >= this.history.length - 1;
-            }
-        }
-
-        // Create an instance of CanvasImageManager
-        new CanvasImageManager('Mycanvas', 'imageUploader', 'shape', 'undoBtn', 'redoBtn');
-    </script>
+ 
+    <script src="script.js">
+       </script>
 </body>
-
+ 
 </html>
